@@ -1,10 +1,9 @@
 package mesh
 
 /*
-#include <ExtractNeuroglancerMesh.h>
-#include <stdlib.h>
-#cgo CFLAGS: -O3 -I/Users/abaden/Projects/DataManager/Mesh
-#cgo LDFLAGS: -L/Users/abaden/Projects/DataManager/build/Mesh -lMesh -L/Users/abaden/Projects/DataManager/build/third_party/NeuroglancerMesh -lneuroglancer_mesh -lboost_iostreams -lz -lglog -lstdc++
+#include <Mesh/ExtractNeuroglancerMesh.h>
+#cgo CFLAGS: -O3 -I/usr/local/include/ndm
+#cgo LDFLAGS: -L/usr/local/lib/ndm -lMesh -lneuroglancer_mesh -lboost_iostreams -lz -lglog -lstdc++
 */
 import "C"
 import (
