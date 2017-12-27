@@ -173,7 +173,20 @@ func main() {
 		panic(errors.New("invalid z coordinate range"))
 	}
 
-	bossExtractionInfo := bossExtractionInfo{*collection, *experiment, *channel, coord.Xvoxelsize, coord.Yvoxelsize, coord.Zvoxelsize}
+	var xVoxelRes, yVoxelRes, zVoxelRes float32
+	if coord.VoxelUnit == "nanometers" {
+		xVoxelRes = coord.Xvoxelsize
+		yVoxelRes = coord.Yvoxelsize
+		zVoxelRes = coord.Zvoxelsize
+	} else if coord.VoxelUnit == "micrometers" {
+		xVoxelRes = coord.Xvoxelsize * 1000.
+		yVoxelRes = coord.Yvoxelsize * 1000.
+		zVoxelRes = coord.Zvoxelsize * 1000.
+	} else {
+		panic(fmt.Errorf("invalid voxel unit: %s", coord.VoxelUnit))
+	}
+
+	bossExtractionInfo := bossExtractionInfo{*collection, *experiment, *channel, xVoxelRes, yVoxelRes, zVoxelRes}
 	// TODO(adb): if res > 0 we will need to adjust the voxel res
 	if *resolution != 0 {
 		panic(errors.New("unable to generate meshes for res > 0"))
