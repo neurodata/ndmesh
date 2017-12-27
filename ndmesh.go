@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	// "github.com/neurodata/ndmesh/boss"
 	"./boss"
@@ -46,36 +47,51 @@ type cutoutInfo struct {
 	res int
 }
 
-func meshExtraction(c chan meshExtractionInfo, boss bossExtractionInfo, cutout cutoutInfo, path string, prefix string, chunkID int, bossServer *boss.Info) {
-	var ret meshExtractionInfo
+type meshJobInfo struct {
+	boss       bossExtractionInfo
+	cutout     cutoutInfo
+	path       string
+	prefix     string
+	chunkID    int
+	bossServer *boss.Info
+}
 
-	cutoutData, err := bossServer.Cutout(boss.collection, boss.experiment, boss.channel, cutout.x, cutout.y, cutout.z, cutout.res)
-	if err != nil {
-		ret.err = err
-		c <- ret
-		return
+func meshExtractionWorker(results chan<- meshExtractionInfo, jobs <-chan meshJobInfo) {
+
+	for j := range jobs {
+		var ret meshExtractionInfo
+
+		cutoutData, err := j.bossServer.Cutout(j.boss.collection, j.boss.experiment, j.boss.channel, j.cutout.x, j.cutout.y, j.cutout.z, j.cutout.res)
+		if err != nil {
+			ret.err = err
+			results <- ret
+			return
+		}
+
+		xoffset := j.cutout.x[0]
+		yoffset := j.cutout.y[0]
+		zoffset := j.cutout.z[0]
+
+		xsize := j.cutout.x[1] - j.cutout.x[0]
+		ysize := j.cutout.y[1] - j.cutout.y[0]
+		zsize := j.cutout.z[1] - j.cutout.z[0]
+
+		numMeshes, err := mesh.ExtractMesh(cutoutData, j.chunkID, fmt.Sprintf("%s/%s.%d", j.path, j.prefix, j.chunkID), xsize, ysize, zsize, xoffset, yoffset, zoffset, j.boss.xres, j.boss.yres, j.boss.zres)
+		if err != nil {
+			ret.err = err
+			results <- ret
+			return
+		}
+
+		ret.numMeshes = numMeshes
+		ret.chunkID = j.chunkID
+		ret.err = nil
+		results <- ret
+
+		// Sleep for 15 seconds to avoid overwhelming the boss
+		time.Sleep(time.Second * 15)
 	}
 
-	xoffset := cutout.x[0]
-	yoffset := cutout.y[0]
-	zoffset := cutout.z[0]
-
-	xsize := cutout.x[1] - cutout.x[0]
-	ysize := cutout.y[1] - cutout.y[0]
-	zsize := cutout.z[1] - cutout.z[0]
-
-	numMeshes, err := mesh.ExtractMesh(cutoutData, chunkID, fmt.Sprintf("%s/%s.%d", path, prefix, chunkID), xsize, ysize, zsize, xoffset, yoffset, zoffset, boss.xres, boss.yres, boss.zres)
-	if err != nil {
-		ret.err = err
-		c <- ret
-		return
-	}
-
-	ret.numMeshes = numMeshes
-	ret.chunkID = chunkID
-	c <- ret
-
-	return
 }
 
 // NeuroglancerManifest describes the file format expected by Neuroglancer to determine all mesh files that make up a single object
@@ -128,6 +144,8 @@ func main() {
 	var ystride = flag.Int("ystride", 0, "The size of the stride in the y dimension")
 	var zstride = flag.Int("zstride", 0, "The size of the stride in the z dimension")
 	var resolution = flag.Int("res", 0, "The resolution of the cutout")
+	var numthreads = flag.Int("threads", 10, "Number of simultaneous goroutines to use")
+
 	flag.Parse()
 
 	if len(*token) == 0 {
@@ -162,6 +180,11 @@ func main() {
 	}
 
 	ch := make(chan meshExtractionInfo)
+	jobs := make(chan meshJobInfo, 500)
+
+	for w := 0; w < *numthreads; w++ {
+		go meshExtractionWorker(ch, jobs)
+	}
 
 	var ctr int
 	ctr = 0
@@ -205,15 +228,15 @@ func main() {
 
 				cutout := cutoutInfo{[2]int{xstart, xend}, [2]int{ystart, yend}, [2]int{zstart, zend}, *resolution}
 				fmt.Printf("%d %d %d -> %d %d %d\n", xstart, ystart, zstart, xend, yend, zend)
-				go meshExtraction(ch, bossExtractionInfo, cutout, *path, *prefix, ctr, &bossServer)
+				jobInfo := meshJobInfo{bossExtractionInfo, cutout, *path, *prefix, ctr, &bossServer}
+				jobs <- jobInfo
 				ctr++
 			}
 		}
 	}
+	close(jobs)
 
-	fmt.Printf("Started %d threads for extraction.\n", ctr)
-
-	// var globalMeshMap = make(map[int][]string)
+	fmt.Printf("Sent %d jobs to %d threads for extraction.\n", ctr, *numthreads)
 
 	numMeshes := 0
 	for i := 0; i < ctr; i++ {
