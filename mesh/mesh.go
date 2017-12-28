@@ -3,7 +3,7 @@ package mesh
 /*
 #include <Mesh/ExtractNeuroglancerMesh.h>
 #cgo CFLAGS: -O3 -I/usr/local/include/ndm
-#cgo LDFLAGS: -L/usr/local/lib/ndm -lMesh -lneuroglancer_mesh -lboost_iostreams -lz -lglog -lstdc++
+#cgo LDFLAGS: -L/usr/local/lib/ndm -lMesh -lneuroglancer_mesh -lboost_iostreams -lboost_system -lz -lglog -lstdc++ -lm -fopenmp
 */
 import "C"
 import (

@@ -9,10 +9,8 @@ import (
 	"strings"
 	"time"
 
-	// "github.com/neurodata/ndmesh/boss"
-	"./boss"
-	// "github.com/neurodata/ndmesh/mesh"
-	"./mesh"
+	"github.com/neurodata/ndmesh/boss"
+	"github.com/neurodata/ndmesh/mesh"
 )
 
 const (
